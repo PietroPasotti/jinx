@@ -27,9 +27,11 @@ def get_jinx_class(path_to_jinx) -> Type[Jinx]:
 
     jinx = None
     for name, obj in module.__dict__.items():
-        if isinstance(obj, type) and issubclass(obj, Jinx_Type) and (obj is not Jinx_Type):
+        if isinstance(obj, type) and issubclass(obj, Jinx_Type) and (
+                obj is not Jinx_Type):
             if jinx:
-                raise RuntimeError(f'multiple jinxes found in {path_to_jinx}: {jinx} and {name}:{obj}')
+                raise RuntimeError(
+                    f'multiple jinxes found in {path_to_jinx}: {jinx} and {name}:{obj}')
             jinx = obj
 
     if not jinx:
@@ -56,9 +58,11 @@ def dump_metadata(jinx: Type[Jinx], root: Path, license: str):
         data['peer'] = {r.name: asdict(r.meta) for r in jinx.__peers__}
 
     if jinx.containers:
-        data['containers'] = {c_name: asdict(c) for c_name, c in jinx.containers.items()}
+        data['containers'] = {c_name: asdict(c) for c_name, c in
+                              jinx.containers.items()}
     if jinx.resources:
-        data['resources'] = {c_name: asdict(c) for c_name, c in jinx.resources.items()}
+        data['resources'] = {c_name: asdict(c) for c_name, c in
+                             jinx.resources.items()}
 
     (root / 'metadata.yaml').write_text(license + yaml.safe_dump(data))
 
@@ -70,13 +74,13 @@ def dump_actions(jinx: Type[Jinx], root: Path, license: str):
     (root / 'actions.yaml').write_text(license + yaml.safe_dump(data))
 
 
-def dump_charmcraft(jinx: Type[Jinx], root: Path, license:str):
+def dump_charmcraft(jinx: Type[Jinx], root: Path, license: str):
     data = {'type': 'charm',
             'bases': jinx.bases.to_dict()}
     (root / 'charmcraft.yaml').write_text(license + yaml.safe_dump(data))
 
 
-def dump_config(jinx: Type[Jinx], root: Path, license:str):
+def dump_config(jinx: Type[Jinx], root: Path, license: str):
     data = {'options': {key: asdict(var) for key, var in
                         jinx.__config__.items()}}
     (root / 'config.yaml').write_text(license + yaml.safe_dump(data))
@@ -84,7 +88,9 @@ def dump_config(jinx: Type[Jinx], root: Path, license:str):
 
 def unpack(path_to_jinx: Union[str, Path], root: Union[str, Path] = None,
            license: str = LIC_HEADER, overwrite=False,
-           include: Sequence[Union[str, Path]] = ()):
+           include: Union[str, Sequence[Union[str, Path]]] = ()):
+    if isinstance(include, str):
+        include = include.split(';')
 
     root = (root or Path()).absolute()
 
@@ -100,7 +106,8 @@ def unpack(path_to_jinx: Union[str, Path], root: Union[str, Path] = None,
         if src.exists() and src.is_dir():
             if charmfile.exists():
                 if not overwrite:
-                    print('found existing /src/charm.py. pass --overwrite to overwrite')
+                    print(
+                        'found existing /src/charm.py. pass --overwrite to overwrite')
                     return
         elif not src.exists():
             os.mkdir(src)
@@ -117,3 +124,27 @@ def unpack(path_to_jinx: Union[str, Path], root: Union[str, Path] = None,
             else:
                 shutil.copy2(pth, src)
             print(f'included {name}')
+
+
+if __name__ == '__main__':
+    from typer import run, Argument, Option
+    def _unpack(
+            path_to_jinx: str = Argument(
+                None, help='path to a file containing a Jinx.'),
+            root: str = Option(
+                None, help="path to charm root folder. "
+                           "If left blank, we'll take it to be ./."),
+            license: str = Option(
+                LIC_HEADER, help='license text to prepend to all '
+                                 'created yaml files. Defaults to '
+                                 'Canonical 2022'),
+            overwrite: bool = Option(
+                False, help='whether to overwrite an '
+                            'existing charm file if present.'),
+            include: str = Option(
+                '', help='semicolon-separated list of files and '
+                         'directories to copy along with the '
+                         'jinx to the root/src.')):
+        unpack(path_to_jinx, root, license, overwrite, include)
+
+    run(_unpack)

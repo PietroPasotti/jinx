@@ -25,12 +25,10 @@ class ExampleJinx(Jinx):
     thing = config(string('my description', default='foo'))
     other_thing = config(float_('my description', default=1.2))
 
-    get_data = action('get_data', ActionMeta(
-        {
-            'foo': string(default='2'),
-            'bar': integer(default=2),
-            'baz': float_(default=2.2)
-        }
+    get_data = action('get_data', params(
+            foo=string(default='2'),
+            bar=integer(default=2),
+            baz=float_(default=2.2)
     ))
 
     def __init__(self, framework):

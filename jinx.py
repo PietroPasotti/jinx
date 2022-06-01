@@ -3,7 +3,10 @@ import logging
 from abc import abstractmethod, ABCMeta
 from dataclasses import dataclass, asdict
 from typing import Dict, TypeVar, Optional, Callable, Union, List, Generic
-from typing_extensions import Literal, overload, TYPE_CHECKING, Type, Self
+try:
+    from typing import Literal, overload, TYPE_CHECKING, Type
+except (ModuleNotFoundError, ImportError):
+    from typing_extensions import Literal, overload, TYPE_CHECKING, Type
 
 import ops
 from ops.charm import CharmBase, RelationCreatedEvent, RelationBrokenEvent, \
