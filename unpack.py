@@ -1,7 +1,9 @@
+#! /bin/python3
+
 import os
 import shutil
 from dataclasses import asdict
-from typing import Union, Type, Sequence
+from typing import Union, Type, Sequence, Optional
 from pathlib import Path
 
 import yaml
@@ -88,7 +90,9 @@ def dump_config(jinx: Type[Jinx], root: Path, license: str):
 
 def unpack(path_to_jinx: Union[str, Path], root: Union[str, Path] = None,
            license: str = LIC_HEADER, overwrite=False,
-           include: Union[str, Sequence[Union[str, Path]]] = ()):
+           include: Optional[Union[str, Sequence[Union[str, Path]]]] = None):
+    if include is None:
+        include = ()
     if isinstance(include, str):
         include = include.split(';')
 
@@ -130,7 +134,8 @@ if __name__ == '__main__':
     from typer import run, Argument, Option
     def _unpack(
             path_to_jinx: str = Argument(
-                None, help='path to a file containing a Jinx.'),
+                ...,
+                help='path to a file containing a Jinx.'),
             root: str = Option(
                 None, help="path to charm root folder. "
                            "If left blank, we'll take it to be ./."),
@@ -141,10 +146,10 @@ if __name__ == '__main__':
             overwrite: bool = Option(
                 False, help='whether to overwrite an '
                             'existing charm file if present.'),
-            include: str = Option(
-                '', help='semicolon-separated list of files and '
-                         'directories to copy along with the '
-                         'jinx to the root/src.')):
+            include: Optional[str] = Option(
+                None, help='semicolon-separated list of files and '
+                           'directories to copy along with the '
+                           'jinx to the root/src.')):
         unpack(path_to_jinx, root, license, overwrite, include)
 
     run(_unpack)

@@ -6,6 +6,7 @@ providing a novel API to write charms.
 Requirements:
 
 - python3.8 (earlier versions might be supported with typing_extensions)
+- typer (to use unpack.py as a script)
 
 ## basic usage
 
