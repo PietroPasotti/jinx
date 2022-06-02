@@ -3,10 +3,35 @@
 This repository contains an experimental wrapper on top of ops/charmcraft
 providing a novel API to write charms.
 
-Requirements:
+## Rationale
+
+As a 'code project' (repo), a charm contains a number of YAML metadata files. 
+The code depends on this metadata, in that the metadata is (at runtime) parsed
+and used to generate dynamically certain namespaces which (at deploy time) are
+used to interact with the juju API.
+
+For example, if you define a 'proxy' config option in `config.yaml`, but your 
+code says `self.config['proxA']`, only the runtime environment (e.g. a unittest) 
+will spot the error, because the runtime will parse the yaml and determine that
+'proxA' is an unknown option.
+
+A way to solve this issue is to specify all that metadata **in code**, so that 
+the linter will know (and lint-time is code-writing-time), that, for example, 
+'proxA' is not a valid config option.
+
+The metadata required by charmcraft can then be derived from the code.
+This has two additional advantages:
+
+- All information is in one place. It's easier to see what resources, actions, 
+  metadata your charm has. You don't need to go search for the yaml file in 
+  which to add this or that piece of information; instead, you do it there next 
+  to the charm code.
+- When developing, you get autocompletion and type-check errors if you make mistakes.
+
+## Requirements
 
 - python3.8 (earlier versions might be supported with typing_extensions)
-- typer (to use unpack.py as a script)
+- typer (to use unpack.py as a CLI tool)
 
 ## basic usage
 
@@ -28,11 +53,14 @@ Save the file and run
 `unpack /path/to/jinx_file.py`
 
 And this will create for you:
-
 - charmcraft.yaml
 - actions.yaml
 - config.yaml
 - metadata.yaml
+
+All except metadata and charmcraft will be empty, because we didn't define any 
+relations, actions, storage, containers or config options. Next we'll see how
+to do just that.
 
 ## relations
 
@@ -112,11 +140,11 @@ class ExampleJinx(Jinx):
         super().__init__(framework, key)
         # you don't observe actions here, instead...
         
-    # you do this:
+    # ...you do this:
     @get_data.handler
     def _on_config_changed(self, event: ActionEvent):
         # the rest is (for now) as usual...
-        event.params['foo']
+        foo = event.params['foo']
 ```
 
 ## storage
