@@ -3,16 +3,14 @@ import logging
 from abc import abstractmethod, ABCMeta
 from dataclasses import dataclass, asdict
 from typing import Dict, TypeVar, Optional, Callable, Union, List, Generic
+
 try:
     from typing import Literal, overload, TYPE_CHECKING, Type
 except (ModuleNotFoundError, ImportError):
     from typing_extensions import Literal, overload, TYPE_CHECKING, Type
 
 import ops
-from ops.charm import CharmBase, RelationCreatedEvent, RelationBrokenEvent, \
-    RelationJoinedEvent, RelationDepartedEvent, RelationChangedEvent, \
-    PebbleReadyEvent, StorageAttachedEvent, StorageDetachingEvent, ActionEvent, \
-    ConfigChangedEvent
+from ops.charm import *
 from ops.framework import Framework, EventSource
 from ops.model import ConfigData
 
@@ -108,9 +106,12 @@ class ActionMeta:
 
 
 @dataclass
-class StorageSpec:
-    disks: Dict
-    range: str
+class FSStorageSpec:
+    type: str
+    location: str
+
+
+StorageSpec = Union[FSStorageSpec]
 
 
 @dataclass
@@ -122,7 +123,15 @@ class ContainerSpec:
 class ResourceSpec:
     type: str = 'oci-image'
     description: str = ''
-    upstream_image: str = ''
+    upstream_source: str = ''
+
+    def to_dict(self):
+        dct = {'type': self.type}
+        if self.description:
+            dct['description'] = self.description
+        if self.upstream_source:
+            dct['upstream-source'] = self.upstream_source
+        return dct
 
 
 T = TypeVar("T")
@@ -144,11 +153,12 @@ class JinxMeta(ops.framework._Metaclass, ABCMeta):
 
 
 class storage:
-    def __init__(self, name: ContainerName, meta: StorageSpec):
-        self.args = (name, meta)
+    def __init__(self, name: ContainerName, type: str, location: str):
+        self.name = name
+        self.meta = FSStorageSpec(type, location)
 
     def __get__(self, obj, _type=None):
-        return _storage(*self.args, obj)
+        return _storage(self.name, self.meta, obj)
 
 
 class _storage(storage):
@@ -193,12 +203,22 @@ class action:
         return action_wrapper
 
 
+class resource:
+    def __init__(self, name: ContainerName,
+                 type: str = 'oci-image',
+                 description: str = None,
+                 upstream_source: str = None):
+        self.name = name
+        self.meta = ResourceSpec(type, description, upstream_source)
+
+
 class container:
-    def __init__(self, name: ContainerName, meta: ContainerSpec):
-        self.args = (name, meta)
+    def __init__(self, name: ContainerName, resource: str):
+        self.name = name
+        self.meta = ContainerSpec(resource)
 
     def __get__(self, obj, _type=None):
-        return _container(*self.args, obj)
+        return _container(self.name, self.meta, obj)
 
 
 class _container(container):
@@ -216,10 +236,9 @@ Role = Literal['require', 'provide', 'peer']
 
 
 class relation:
-    def __init__(self, name: str, meta: InterfaceMeta,
-                 role: Role):
+    def __init__(self, name: str, interface: str, role: Role):
         self.name = name
-        self.meta = meta
+        self.meta = InterfaceMeta(interface)
         self.role = role
 
     def __get__(self, obj, _type=None):
@@ -254,16 +273,16 @@ class _relation(relation):
         self._obj.framework.observe(self.changed, callback)
 
 
-def require(name: str, meta: InterfaceMeta) -> _relation:
-    return relation(name, meta, 'require')  # type: ignore
+def require(name: str, interface: str) -> _relation:
+    return relation(name, interface, 'require')  # type: ignore
 
 
-def provide(name: str, meta: InterfaceMeta) -> _relation:
-    return relation(name, meta, 'provide')  # type: ignore
+def provide(name: str, interface: str) -> _relation:
+    return relation(name, interface, 'provide')  # type: ignore
 
 
-def peer(name: str, meta: InterfaceMeta) -> _relation:
-    return relation(name, meta, 'peer')  # type: ignore
+def peer(name: str, interface: str) -> _relation:
+    return relation(name, interface, 'peer')  # type: ignore
 
 
 class ExtendedConfigData(ConfigData):
@@ -277,6 +296,11 @@ class Jinx(CharmBase, metaclass=JinxMeta):
     __provides__: List['relation'] = []
     __requires__: List['relation'] = []
     __peers__: List['relation'] = []
+
+    # TODO: implement
+    __storage__: List['storage'] = None
+    __containers__: List['container'] = None
+    __resources__: List = None
 
     if TYPE_CHECKING:
         framework: Framework
@@ -293,9 +317,61 @@ class Jinx(CharmBase, metaclass=JinxMeta):
                          [Base('ubuntu', 'focal')])
     subordinate: bool = False
 
-    storage: Optional[Dict[StorageName, StorageSpec]] = None
-    containers: Optional[Dict[ContainerName, ContainerSpec]] = None
-    resources: Optional[Dict[ResourceName, ResourceSpec]] = None
+    def on_install(self, callback: Callable[[InstallEvent], None]) -> None:
+        """Register a callback for install."""
+        self.framework.observe(self.on.install, callback)
+
+    def on_start(self, callback: Callable[[StartEvent], None]) -> None:
+        """Register a callback for start."""
+        self.framework.observe(self.on.start, callback)
+
+    def on_stop(self, callback: Callable[[StopEvent], None]) -> None:
+        """Register a callback for stop."""
+        self.framework.observe(self.on.stop, callback)
+
+    def on_remove(self, callback: Callable[[RemoveEvent], None]) -> None:
+        """Register a callback for remove."""
+        self.framework.observe(self.on.remove, callback)
+
+    def on_update_status(self,
+                         callback: Callable[[UpdateStatusEvent], None]) -> None:
+        """Register a callback for update_status."""
+        self.framework.observe(self.on.update_status, callback)
+
+    def on_config_changed(self, callback: Callable[
+        [ConfigChangedEvent], None]) -> None:
+        """Register a callback for config_changed."""
+        self.framework.observe(self.on.config_changed, callback)
+
+    def on_upgrade_charm(self,
+                         callback: Callable[[UpgradeCharmEvent], None]) -> None:
+        """Register a callback for upgrade_charm."""
+        self.framework.observe(self.on.upgrade_charm, callback)
+
+    def on_pre_series_upgrade(self, callback: Callable[
+        [PreSeriesUpgradeEvent], None]) -> None:
+        """Register a callback for pre_series_upgrade."""
+        self.framework.observe(self.on.pre_series_upgrade, callback)
+
+    def on_post_series_upgrade(self, callback: Callable[
+        [PostSeriesUpgradeEvent], None]) -> None:
+        """Register a callback for post_series_upgrade."""
+        self.framework.observe(self.on.post_series_upgrade, callback)
+
+    def on_leader_elected(self, callback: Callable[
+        [LeaderElectedEvent], None]) -> None:
+        """Register a callback for leader_elected."""
+        self.framework.observe(self.on.leader_elected, callback)
+
+    def on_leader_settings_changed(self, callback: Callable[
+        [LeaderSettingsChangedEvent], None]) -> None:
+        """Register a callback for leader_settings_changed."""
+        self.framework.observe(self.on.leader_settings_changed, callback)
+
+    def on_collect_metrics(self, callback: Callable[
+        [CollectMetricsEvent], None]) -> None:
+        """Register a callback for collect_metrics."""
+        self.framework.observe(self.on.collect_metrics, callback)
 
     @property
     def config(self) -> ExtendedConfigData:
@@ -320,6 +396,15 @@ class Jinx(CharmBase, metaclass=JinxMeta):
                         f'registered action handler for {name}: {handler}')
                     cls.framework.observe(cls.on[obj.name].action, handler)
                 cls.__actions__.append(obj)
+
+            elif isinstance(obj, storage):
+                cls.__storage__.append(obj)
+
+            elif isinstance(obj, container):
+                cls.__containers__.append(obj)
+
+            # elif isinstance(obj, resource):
+            #     cls.__resources__.append(obj)
 
             elif isinstance(obj, config):
                 obj.bind(name)

@@ -46,7 +46,9 @@ LIC_HEADER = """# Copyright 2022 Canonical Ltd.
 
 
 def dump_metadata(jinx: Type[Jinx], root: Path, license: str):
-    data = {'name': jinx.name}
+    data = {'name': jinx.name,
+            'subordinate': jinx.subordinate}
+
     if jinx.description:
         data['description'] = jinx.description
     if jinx.summary:
@@ -59,12 +61,15 @@ def dump_metadata(jinx: Type[Jinx], root: Path, license: str):
     if jinx.__peers__:
         data['peer'] = {r.name: asdict(r.meta) for r in jinx.__peers__}
 
-    if jinx.containers:
-        data['containers'] = {c_name: asdict(c) for c_name, c in
-                              jinx.containers.items()}
-    if jinx.resources:
-        data['resources'] = {c_name: asdict(c) for c_name, c in
-                             jinx.resources.items()}
+    if jinx.__containers__:
+        data['containers'] = {c.name: asdict(c.meta) for c in
+                              jinx.__containers__}
+    if jinx.__resources__:
+        data['resources'] = {c.name: asdict(c.meta) for c in
+                              jinx.__resources__}
+    if jinx.__storage__:
+        data['storage'] = {c.name: asdict(c.meta) for c in
+                              jinx.__storage__}
 
     (root / 'metadata.yaml').write_text(license + yaml.safe_dump(data))
 
