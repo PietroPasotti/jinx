@@ -88,7 +88,7 @@ def dump_charmcraft(jinx: Type[Jinx], root: Path, license: str):
 
 
 def dump_config(jinx: Type[Jinx], root: Path, license: str):
-    data = {'options': {key: asdict(var) for key, var in
+    data = {'options': {key: asdict(conf.var) for key, conf in
                         jinx.__config__.items()}}
     (root / 'config.yaml').write_text(license + yaml.safe_dump(data))
 

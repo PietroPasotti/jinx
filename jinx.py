@@ -37,6 +37,10 @@ class Bases:
 RelationName = ResourceName = StorageName = ContainerName = ActionName = str
 
 
+def _sanitize(s: str) -> str:
+    return s.replace('-', '_')
+
+
 @dataclass
 class InterfaceMeta:
     interface: str
@@ -82,19 +86,26 @@ def float_(description: str = '', default: float = None) -> _Param:
     return Param('float', description, default)
 
 
-class config:
-    def __init__(self, var: _Param):
-        self.var = var
-        self._name = None  # set by metaclass
+class LateBoundNamed:
+    def __init__(self, name: Optional[str]):
+        self._name = name  # set by .bind() later if None
 
     @property
     def name(self):
         if not self._name:
-            raise RuntimeError('config not bound')
+            raise RuntimeError(f'unbound {self}')
         return self._name
 
     def bind(self, name):
-        self._name = name
+        """Defaults name to prop."""
+        if not self._name:
+            self._name = name
+
+
+class _Config(LateBoundNamed):
+    def __init__(self, name: Optional[str], var: _Param):
+        super().__init__(name)
+        self.var = var
 
     def __get__(self, instance, owner: 'Jinx'):
         return instance.config[self.name]
@@ -108,7 +119,7 @@ class ActionMeta:
 @dataclass
 class FSStorageSpec:
     type: str
-    location: str
+    location: Optional[str] = None
 
 
 StorageSpec = Union[FSStorageSpec]
@@ -152,21 +163,21 @@ class JinxMeta(ops.framework._Metaclass, ABCMeta):
         return inst
 
 
-class storage:
-    def __init__(self, name: ContainerName, type: str, location: str):
-        self.name = name
+class _Storage(LateBoundNamed):
+    def __init__(self, name: Optional[ContainerName], type: str, location: str = None):
+        super().__init__(name)
         self.meta = FSStorageSpec(type, location)
 
     def __get__(self, obj, _type=None):
-        return _storage(self.name, self.meta, obj)
+        return _BoundStorage(self.name, self.meta.type, self.meta.location, obj)
 
 
-class _storage(storage):
-    def __init__(self, name: ContainerName, meta: StorageSpec,
+class _BoundStorage(_Storage):
+    def __init__(self, name: ContainerName, type: str, location: str,
                  obj: CharmBase):
-        super().__init__(name, meta)
-        self.attached = obj.on[name].storage_attached
-        self.detaching = obj.on[name].storage_detached
+        super().__init__(name, type, location)
+        self.attached = obj.on[_sanitize(name)].storage_attached
+        self.detaching = obj.on[_sanitize(name)].storage_detaching
         self._obj = obj
 
     def on_attached(self, callback: Callable[[StorageAttachedEvent], None]):
@@ -176,16 +187,11 @@ class _storage(storage):
         self._obj.framework.observe(self.detaching, callback)
 
 
-class params:
-    def __init__(self, **params: _Param):
-        self._params = params
-
-
-class action:
-    def __init__(self, name: ActionName, params: 'params' = None):
-        self.name = name
+class _Action(LateBoundNamed):
+    def __init__(self, name: Optional[ActionName], params: Dict[str, _Param] = None):
+        super().__init__(name)
         self.params = params
-        self.meta = ActionMeta(params._params if params else {})
+        self.meta = ActionMeta(params if params else {})
 
     def as_dict(self):
         return {self.name: asdict(self.meta)}
@@ -203,29 +209,29 @@ class action:
         return action_wrapper
 
 
-class resource:
-    def __init__(self, name: ContainerName,
+class _Resource(LateBoundNamed):
+    def __init__(self, name: Optional[ContainerName] = None,
                  type: str = 'oci-image',
                  description: str = None,
                  upstream_source: str = None):
-        self.name = name
+        super().__init__(name)
         self.meta = ResourceSpec(type, description, upstream_source)
 
 
-class container:
-    def __init__(self, name: ContainerName, resource: str):
-        self.name = name
+class _Container(LateBoundNamed):
+    def __init__(self, name: Optional[ContainerName], resource: str):
+        super().__init__(name)
         self.meta = ContainerSpec(resource)
 
     def __get__(self, obj, _type=None):
-        return _container(self.name, self.meta, obj)
+        return _BoundContainer(self.name, self.meta.resource, obj)
 
 
-class _container(container):
-    def __init__(self, name: ContainerName, meta: ContainerSpec,
+class _BoundContainer(_Container):
+    def __init__(self, name: ContainerName, resource: str,
                  obj: CharmBase):
-        super().__init__(name, meta)
-        self.pebble_ready = obj.on[name].pebble_ready
+        super().__init__(name, resource)
+        self.pebble_ready = obj.on[_sanitize(name)].pebble_ready
         self._obj = obj
 
     def on_pebble_ready(self, callback: Callable[[PebbleReadyEvent], None]):
@@ -235,26 +241,27 @@ class _container(container):
 Role = Literal['require', 'provide', 'peer']
 
 
-class relation:
-    def __init__(self, name: str, interface: str, role: Role):
-        self.name = name
+class _Relation(LateBoundNamed):
+    def __init__(self, name: Optional[str], interface: str, role: Role):
+        super().__init__(name)
         self.meta = InterfaceMeta(interface)
         self.role = role
 
     def __get__(self, obj, _type=None):
-        return _relation(self.name, self.meta, self.role, obj)
+        return _BoundRelation(self.name, self.meta.interface, self.role, obj)
 
 
-class _relation(relation):
-    def __init__(self, name: str, meta: InterfaceMeta,
+class _BoundRelation(_Relation):
+    def __init__(self, name: str,
+                 interface: str,
                  role: Role,
                  obj: CharmBase):
-        super(_relation, self).__init__(name, meta, role)
-        self.created = obj.on[name].relation_created
-        self.broken = obj.on[name].relation_broken
-        self.joined = obj.on[name].relation_joined
-        self.departed = obj.on[name].relation_departed
-        self.changed = obj.on[name].relation_changed
+        super().__init__(name, interface, role)
+        self.created = obj.on[_sanitize(name)].relation_created
+        self.broken = obj.on[_sanitize(name)].relation_broken
+        self.joined = obj.on[_sanitize(name)].relation_joined
+        self.departed = obj.on[_sanitize(name)].relation_departed
+        self.changed = obj.on[_sanitize(name)].relation_changed
         self._obj = obj
 
     def on_created(self, callback: Callable[[RelationCreatedEvent], None]):
@@ -273,34 +280,20 @@ class _relation(relation):
         self._obj.framework.observe(self.changed, callback)
 
 
-def require(name: str, interface: str) -> _relation:
-    return relation(name, interface, 'require')  # type: ignore
-
-
-def provide(name: str, interface: str) -> _relation:
-    return relation(name, interface, 'provide')  # type: ignore
-
-
-def peer(name: str, interface: str) -> _relation:
-    return relation(name, interface, 'peer')  # type: ignore
-
-
 class ExtendedConfigData(ConfigData):
     on_changed: Callable[[Callable[[ConfigChangedEvent], None]], None]
     changed: EventSource
 
 
 class Jinx(CharmBase, metaclass=JinxMeta):
-    __actions__: List['action'] = []
-    __config__: Dict[str, '_Param'] = {}
-    __provides__: List['relation'] = []
-    __requires__: List['relation'] = []
-    __peers__: List['relation'] = []
-
-    # TODO: implement
-    __storage__: List['storage'] = None
-    __containers__: List['container'] = None
-    __resources__: List = None
+    __actions__: List['_Action']
+    __config__: Dict[str, '_Config']
+    __provides__: List['_Relation']
+    __requires__: List['_Relation']
+    __peers__: List['_Relation']
+    __storage__: List['_Storage']
+    __containers__: List['_Container']
+    __resources__: List['_Resource']
 
     if TYPE_CHECKING:
         framework: Framework
@@ -387,37 +380,95 @@ class Jinx(CharmBase, metaclass=JinxMeta):
         return config_
 
     def __init_subclass__(cls, **kwargs):
-        for name, obj in vars(cls).items():
-            if isinstance(obj, action):
-                handlers = [obj for obj in vars(cls) if
-                            getattr(obj, '__action__', None) is obj]
-                for handler in handlers:
-                    logger.debug(
-                        f'registered action handler for {name}: {handler}')
-                    cls.framework.observe(cls.on[obj.name].action, handler)
-                cls.__actions__.append(obj)
+        # dedup
+        cls.__actions__: List['_Action'] = []
+        cls.__config__: Dict[str, '_Config'] = {}
+        cls.__provides__: List['_Relation'] = []
+        cls.__requires__: List['_Relation'] = []
+        cls.__peers__: List['_Relation'] = []
+        cls.__storage__: List['_Storage'] = []
+        cls.__containers__: List['_Container'] = []
+        cls.__resources__: List['_Resource'] = []
 
-            elif isinstance(obj, storage):
-                cls.__storage__.append(obj)
+        for parent in cls.mro():
+            for name, obj in vars(parent).items():
+                if isinstance(obj, LateBoundNamed):
+                    # allow defaulting name to the attr they are assigned
+                    # to in this class
+                    obj.bind(name)
 
-            elif isinstance(obj, container):
-                cls.__containers__.append(obj)
+                if isinstance(obj, _Action):
+                    handlers = [obj for obj in vars(cls) if
+                                getattr(obj, '__action__', None) is obj]
+                    for handler in handlers:
+                        logger.debug(
+                            f'registered action handler for {name}: {handler}')
+                        cls.framework.observe(cls.on[obj.name].action, handler)
 
-            # elif isinstance(obj, resource):
-            #     cls.__resources__.append(obj)
+                    cls.__actions__.append(obj)
 
-            elif isinstance(obj, config):
-                obj.bind(name)
-                cls.__config__[name] = obj.var
-                logger.debug(f'registered config handle for {name}: {obj}')
+                elif isinstance(obj, _Storage):
+                    cls.__storage__.append(obj)
 
-            elif isinstance(obj, relation):
-                if obj.role == 'provide':
-                    cls.__provides__.append(obj)
-                    logger.debug(f'registered provides({name})')
-                if obj.role == 'require':
-                    cls.__requires__.append(obj)
-                    logger.debug(f'registered requires({name})')
-                if obj.role == 'peer':
-                    cls.__peers__.append(obj)
-                    logger.debug(f'registered peer({name})')
+                elif isinstance(obj, _Container):
+                    cls.__containers__.append(obj)
+
+                # elif isinstance(obj, resource):
+                #     cls.__resources__.append(obj)
+
+                elif isinstance(obj, _Config):
+                    cls.__config__[name] = obj
+                    logger.debug(f'registered config handle for {name}: {obj}')
+
+                elif isinstance(obj, _Relation):
+                    if obj.role == 'provide':
+                        cls.__provides__.append(obj)
+                        logger.debug(f'registered provides({name})')
+                    if obj.role == 'require':
+                        cls.__requires__.append(obj)
+                        logger.debug(f'registered requires({name})')
+                    if obj.role == 'peer':
+                        cls.__peers__.append(obj)
+                        logger.debug(f'registered peer({name})')
+
+
+# utility constructors
+def config(param: _Param, name: str = None) -> _Config:
+    return _Config(name, param)
+
+
+def relation(interface: str, role: Role, name: str = None) -> _Relation:
+    return _Relation(name, interface=interface, role=role)
+
+
+def require(interface: str = None, name: str = None) -> _Relation:
+    return _Relation(name, interface=interface, role='require')
+
+
+def provide(interface: str = None, name: str = None) -> _Relation:
+    return _Relation(name, interface=interface, role='provide')
+
+
+def peer(interface: str = None, name: str = None) -> _Relation:
+    return _Relation(name, interface=interface, role='peer')
+
+
+def container(resource: str, name: str = None) -> _Container:
+    return _Container(name, resource)
+
+
+def resource(type: str = 'oci-image',
+             description: str = None,
+             upstream_source: str = None,
+             name: str = None) -> _Resource:
+    return _Resource(name=name, type=type, description=description,
+                     upstream_source=upstream_source)
+
+
+def action(params: Dict[str, _Param] = None, name: str = None) -> _Action:
+    return _Action(name, params)
+
+
+def storage(type: str, location: str = None, name: str = None) -> _Storage:
+    return _Storage(name, type=type, location=location)
+#fmt: on

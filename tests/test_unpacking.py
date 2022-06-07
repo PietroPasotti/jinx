@@ -9,7 +9,8 @@ from unpack import unpack
 
 META = {'name': 'my-charm',
         'requires': {'db': {'interface': 'interface'}},
-        'provides': {'ingress': {'interface': 'ingress-per-cookie'}}}
+        'provides': {'ingress': {'interface': 'ingress-per-cookie'}},
+        'subordinate': False}
 ACTIONS = {
     'get_data': {
         'params': {
@@ -44,13 +45,13 @@ CHARMCRAFT = {'type': 'charm',
 class ExampleJinx(Jinx):
     name = 'my-charm'
 
-    db_relation = require('db', InterfaceMeta('interface'))
-    ingress_relation = provide('ingress', InterfaceMeta('ingress-per-cookie'))
+    db_relation = require(name='db', interface='interface')
+    ingress = provide(interface='ingress-per-cookie')
 
     thing = config(string('my description', default='foo'))
     other_thing = config(float_('my description', default=1.2))
 
-    get_data = action('get_data', params(
+    get_data = action(dict(
             foo=string(default='2'),
             bar=integer(default=2),
             baz=float_(default=2.2)

@@ -11,8 +11,8 @@ class MyCharm(Jinx):
     description = 'nothing special'
     maintainer = 'your.name@foo.bar'
 
-    workload = container('workload-container', resource='workload')
-    workload_resource = resource('workload', type='oci-image')
+    workload = _container('workload-container', resource='workload')
+    workload_resource = _Resource('workload', type='oci-image')
     disk = storage('disk', 'filesystem', '/data/db')
     log_me = action('log-me')
 
