@@ -426,8 +426,8 @@ class Jinx(CharmBase, metaclass=JinxMeta):
                 elif isinstance(obj, _Container):
                     cls.__containers__.append(obj)
 
-                # elif isinstance(obj, resource):
-                #     cls.__resources__.append(obj)
+                elif isinstance(obj, _Resource):
+                    cls.__resources__.append(obj)
 
                 elif isinstance(obj, _Config):
                     cls.__config__[name] = obj
