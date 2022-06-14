@@ -1,8 +1,13 @@
+#!/bin/python3
+
 import typing
 
 from ops.model import ActiveStatus
 
-from jinx import *
+try:
+    from jinx import *
+except ModuleNotFoundError:
+    from charms.jinx import *
 
 
 class MyCharm(Jinx):

@@ -111,35 +111,36 @@ def unpack(path_to_jinx: Union[str, Path], root: Union[str, Path] = None,
     dump_config(jinx, root, license)
     dump_charmcraft(jinx, root, license)
 
-    if root:
-        src = root / 'src'
-        charmfile = src / 'charm.py'
-        if src.exists() and src.is_dir():
-            if charmfile.exists():
-                if not overwrite:
-                    print(
-                        'found existing /src/charm.py. pass --overwrite to overwrite')
-                    return
-        elif not src.exists():
-            os.mkdir(src)
+    src = root / 'src'
+    charmfile = src / 'charm.py'
+
+    if src.exists() and src.is_dir():
+        if charmfile.exists():
+            if not overwrite:
+                print(
+                    'found existing /src/charm.py. pass --overwrite to overwrite')
+                return
+    elif not src.exists():
+        os.mkdir(src)
+    else:
+        # src is a file
+        print('expected /src directory; found a "src" file!')
+        return
+
+    if path_to_jinx.absolute() != charmfile.absolute():
+        shutil.copy2(path_to_jinx, charmfile)
+
+    for name in include:
+        pth = Path(name)
+        if pth.is_dir():
+            shutil.copytree(pth, src)
         else:
-            # src is a file
-            print('expected /src directory; found a "src" file!')
-            return
+            shutil.copy2(pth, src)
+        print(f'included {name}')
 
-        if not path_to_jinx == charmfile:
-            shutil.copy2(path_to_jinx, charmfile)
-            # chmod +x
-            st = os.stat(charmfile)
-            os.chmod(charmfile, st.st_mode | stat.S_IEXEC)
-
-        for name in include:
-            pth = Path(name)
-            if pth.is_dir():
-                shutil.copytree(pth, src)
-            else:
-                shutil.copy2(pth, src)
-            print(f'included {name}')
+    # ensure charmfile is executable
+    st = os.stat(charmfile)
+    os.chmod(charmfile, st.st_mode | stat.S_IEXEC)
 
 
 if __name__ == '__main__':
