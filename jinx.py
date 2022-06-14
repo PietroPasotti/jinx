@@ -542,7 +542,7 @@ class Serializer:
             data['containers'] = {c.name: asdict(c.meta) for c in
                                   jinx.__containers__}
         if jinx.__resources__:
-            data['resources'] = {c.name: asdict(c.meta) for c in
+            data['resources'] = {c.name: c.meta.to_dict() for c in
                                  jinx.__resources__}
         if jinx.__storage__:
             data['storage'] = {c.name: asdict(c.meta) for c in
