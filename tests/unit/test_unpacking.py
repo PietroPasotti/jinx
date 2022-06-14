@@ -37,8 +37,8 @@ CONFIG = {'options':
 }
 CHARMCRAFT = {'type': 'charm',
               'bases': [{
-                  'build-on': [{'name': 'ubuntu', 'channel': 'focal'}],
-                  'run-on': [{'name': 'ubuntu', 'channel': 'focal'}]
+                  'build-on': [{'name': 'ubuntu', 'channel': '20.04'}],
+                  'run-on': [{'name': 'ubuntu', 'channel': '20.04'}]
               }]
               }
 

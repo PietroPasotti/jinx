@@ -306,8 +306,8 @@ class Jinx(CharmBase, metaclass=JinxMeta):
     summary: Optional[str] = None
     maintainer: Optional[str] = None
     description: Optional[str] = None
-    bases: List[Base] = [Base(build_on=[Platform('ubuntu', 'focal')],
-                              run_on=[Platform('ubuntu', 'focal')])]
+    bases: List[Base] = [Base(build_on=[Platform('ubuntu', '20.04')],
+                              run_on=[Platform('ubuntu', '20.04')])]
     subordinate: bool = False
 
     def on_install(self, callback: Callable[[InstallEvent], None]) -> None:
