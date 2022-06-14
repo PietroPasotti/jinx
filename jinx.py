@@ -61,16 +61,27 @@ class _Param:
 
 # fmt: off
 @overload
-def Param(type: Literal['string'], description: str = '', default: Optional[str] = None) -> _Param: ...
+def Param(type: Literal['string'], description: str = '',
+          default: Optional[str] = None) -> _Param: ...
+
+
 @overload
-def Param(type: Literal['float'], description: str = '', default: Optional[float] = None) -> _Param: ...
+def Param(type: Literal['float'], description: str = '',
+          default: Optional[float] = None) -> _Param: ...
+
+
 @overload
-def Param(type: Literal['integer'], description: str = '', default: Optional[int] = None) -> _Param: ...
+def Param(type: Literal['integer'], description: str = '',
+          default: Optional[int] = None) -> _Param: ...
+
+
 def Param(type: Literal['string', 'float', 'integer'],
           description: str = '',
           default: Optional[Union[str, float, int]] = None
           ) -> _Param:
     return _Param(type, description, default)
+
+
 # fmt: on
 
 
@@ -164,7 +175,8 @@ class JinxMeta(ops.framework._Metaclass, ABCMeta):
 
 
 class _Storage(LateBoundNamed):
-    def __init__(self, name: Optional[ContainerName], type: str, location: str = None):
+    def __init__(self, name: Optional[ContainerName], type: str,
+                 location: str = None):
         super().__init__(name)
         self.meta = FSStorageSpec(type, location)
 
@@ -188,7 +200,8 @@ class _BoundStorage(_Storage):
 
 
 class _Action(LateBoundNamed):
-    def __init__(self, name: Optional[ActionName], params: Dict[str, _Param] = None):
+    def __init__(self, name: Optional[ActionName],
+                 params: Dict[str, _Param] = None):
         super().__init__(name)
         self.params = params
         self.meta = ActionMeta(params if params else {})
@@ -471,7 +484,9 @@ def action(params: Dict[str, _Param] = None, name: str = None) -> _Action:
 
 def storage(type: str, location: str = None, name: str = None) -> _Storage:
     return _Storage(name, type=type, location=location)
-#fmt: on
+
+
+# fmt: on
 
 
 class Serializer:
@@ -481,10 +496,9 @@ class Serializer:
     @property
     def config(self):
         jinx = self.jinx
-        data = {}
-        if jinx.__config__:
-            data['options'] = {key: asdict(conf.var) for key, conf in
-                               jinx.__config__.items()}
+        data = {'options': {
+            key: asdict(conf.var) for key, conf in
+            jinx.__config__.items()}}
         return data
 
     @property
