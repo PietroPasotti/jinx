@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-from jinx import Jinx
+from jinx import Jinx, Serializer
 
 import importlib.util
 import sys
@@ -46,52 +46,20 @@ LIC_HEADER = """# Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.\n\n"""
 
 
-def dump_metadata(jinx: Type[Jinx], root: Path, license: str):
-    data = {'name': jinx.name,
-            'subordinate': jinx.subordinate}
-
-    if jinx.description:
-        data['description'] = jinx.description
-    if jinx.summary:
-        data['summary'] = jinx.summary
-
-    if jinx.__provides__:
-        data['provides'] = {r.name: asdict(r.meta) for r in jinx.__provides__}
-    if jinx.__requires__:
-        data['requires'] = {r.name: asdict(r.meta) for r in jinx.__requires__}
-    if jinx.__peers__:
-        data['peer'] = {r.name: asdict(r.meta) for r in jinx.__peers__}
-
-    if jinx.__containers__:
-        data['containers'] = {c.name: asdict(c.meta) for c in
-                              jinx.__containers__}
-    if jinx.__resources__:
-        data['resources'] = {c.name: asdict(c.meta) for c in
-                              jinx.__resources__}
-    if jinx.__storage__:
-        data['storage'] = {c.name: asdict(c.meta) for c in
-                              jinx.__storage__}
-
-    (root / 'metadata.yaml').write_text(license + yaml.safe_dump(data))
+def dump_metadata(serializer: Serializer, root: Path, license: str):
+    (root / 'metadata.yaml').write_text(license + yaml.safe_dump(serializer.metadata))
 
 
-def dump_actions(jinx: Type[Jinx], root: Path, license: str):
-    data = {}
-    for a in jinx.__actions__:
-        data.update(a.as_dict())
-    (root / 'actions.yaml').write_text(license + yaml.safe_dump(data))
+def dump_actions(serializer: Serializer, root: Path, license: str):
+    (root / 'actions.yaml').write_text(license + yaml.safe_dump(serializer.actions))
 
 
-def dump_charmcraft(jinx: Type[Jinx], root: Path, license: str):
-    data = {'type': 'charm',
-            'bases': [base.to_dict() for base in jinx.bases]}
-    (root / 'charmcraft.yaml').write_text(license + yaml.safe_dump(data))
+def dump_charmcraft(serializer: Serializer, root: Path, license: str):
+    (root / 'charmcraft.yaml').write_text(license + yaml.safe_dump(serializer.charmcraft))
 
 
-def dump_config(jinx: Type[Jinx], root: Path, license: str):
-    data = {'options': {key: asdict(conf.var) for key, conf in
-                        jinx.__config__.items()}}
-    (root / 'config.yaml').write_text(license + yaml.safe_dump(data))
+def dump_config(serializer: Serializer, root: Path, license: str):
+    (root / 'config.yaml').write_text(license + yaml.safe_dump(serializer.config))
 
 
 def unpack(path_to_jinx: Union[str, Path], root: Union[str, Path] = None,
@@ -106,10 +74,11 @@ def unpack(path_to_jinx: Union[str, Path], root: Union[str, Path] = None,
     path_to_jinx = Path(path_to_jinx).absolute()
 
     jinx = get_jinx_class(path_to_jinx)
-    dump_metadata(jinx, root, license)
-    dump_actions(jinx, root, license)
-    dump_config(jinx, root, license)
-    dump_charmcraft(jinx, root, license)
+    serializer = Serializer(jinx)
+    dump_metadata(serializer, root, license)
+    dump_actions(serializer, root, license)
+    dump_config(serializer, root, license)
+    dump_charmcraft(serializer, root, license)
 
     src = root / 'src'
     charmfile = src / 'charm.py'

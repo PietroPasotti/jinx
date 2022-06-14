@@ -472,3 +472,74 @@ def action(params: Dict[str, _Param] = None, name: str = None) -> _Action:
 def storage(type: str, location: str = None, name: str = None) -> _Storage:
     return _Storage(name, type=type, location=location)
 #fmt: on
+
+
+class Serializer:
+    def __init__(self, jinx: Type[Jinx]):
+        self.jinx = jinx
+
+    @property
+    def config(self):
+        jinx = self.jinx
+        data = {}
+        if jinx.__config__:
+            data['options'] = {key: asdict(conf.var) for key, conf in
+                               jinx.__config__.items()}
+        return data
+
+    @property
+    def charmcraft(self):
+        jinx = self.jinx
+        data = {'type': 'charm',
+                'bases': [base.to_dict() for base in jinx.bases]}
+        return data
+
+    @property
+    def actions(self):
+        jinx = self.jinx
+        data = {}
+        for a in jinx.__actions__:
+            data.update(a.as_dict())
+        return data
+
+    @property
+    def metadata(self):
+        jinx = self.jinx
+        data = {'name': jinx.name}
+
+        if jinx.subordinate:
+            data['subordinate'] = jinx.subordinate
+
+        if jinx.description:
+            data['description'] = jinx.description
+        if jinx.summary:
+            data['summary'] = jinx.summary
+
+        if jinx.__provides__:
+            data['provides'] = {r.name: asdict(r.meta) for r in
+                                jinx.__provides__}
+        if jinx.__requires__:
+            data['requires'] = {r.name: asdict(r.meta) for r in
+                                jinx.__requires__}
+        if jinx.__peers__:
+            data['peers'] = {r.name: asdict(r.meta) for r in jinx.__peers__}
+
+        if jinx.__containers__:
+            data['containers'] = {c.name: asdict(c.meta) for c in
+                                  jinx.__containers__}
+        if jinx.__resources__:
+            data['resources'] = {c.name: asdict(c.meta) for c in
+                                 jinx.__resources__}
+        if jinx.__storage__:
+            data['storage'] = {c.name: asdict(c.meta) for c in
+                               jinx.__storage__}
+        return data
+
+
+def harness(jinx: Type[Jinx]):
+    from ops.testing import Harness
+    serializer = Serializer(jinx)
+    return Harness(jinx,
+                   meta=yaml.safe_dump(serializer.metadata),
+                   actions=yaml.safe_dump(serializer.actions),
+                   config=yaml.safe_dump(serializer.config))

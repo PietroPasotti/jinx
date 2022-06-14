@@ -29,3 +29,4 @@ async def test_template(ops_test: OpsTest):
 
         await ops_test.model.deploy(expected_charm_file)
         await ops_test.model.wait_for_idle(['my-charm'])
+
