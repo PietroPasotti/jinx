@@ -63,3 +63,7 @@ class MyCharm(Jinx):
         print(evt_name)
         self.unit.status = ActiveStatus(evt_name)
 
+
+if __name__ == '__main__':
+    from ops.main import main
+    main(MyCharm)
