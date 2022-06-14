@@ -83,7 +83,7 @@ def dump_actions(jinx: Type[Jinx], root: Path, license: str):
 
 def dump_charmcraft(jinx: Type[Jinx], root: Path, license: str):
     data = {'type': 'charm',
-            'bases': jinx.bases.to_dict()}
+            'bases': [base.to_dict() for base in jinx.bases]}
     (root / 'charmcraft.yaml').write_text(license + yaml.safe_dump(data))
 
 

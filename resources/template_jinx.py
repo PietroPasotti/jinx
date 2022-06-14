@@ -11,10 +11,10 @@ class MyCharm(Jinx):
     description = 'nothing special'
     maintainer = 'your.name@foo.bar'
 
-    workload = _container('workload-container', resource='workload')
-    workload_resource = _Resource('workload', type='oci-image')
-    disk = storage('disk', 'filesystem', '/data/db')
-    log_me = action('log-me')
+    workload = container(name='workload-container', resource='workload')
+    workload_resource = resource(name='workload', type='oci-image')
+    disk = storage('filesystem', '/data/db', 'disk')
+    log_me = action(name='log-me')
 
     db = provide('database-relation', 'db-interface')
     peers = peer('db-peers', 'db-replicas')

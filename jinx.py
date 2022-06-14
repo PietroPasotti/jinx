@@ -19,15 +19,15 @@ logger = logging.getLogger('jinx')
 
 
 @dataclass
-class Base:
+class Platform:
     name: str = 'ubuntu'
     channel: str = '20.04'
 
 
 @dataclass
-class Bases:
-    run_on: List[Base]
-    build_on: List[Base]
+class Base:
+    run_on: List[Platform]
+    build_on: List[Platform]
 
     def to_dict(self):
         return {'run-on': [asdict(b) for b in self.run_on],
@@ -306,8 +306,8 @@ class Jinx(CharmBase, metaclass=JinxMeta):
     summary: Optional[str] = None
     maintainer: Optional[str] = None
     description: Optional[str] = None
-    bases: Bases = Bases([Base('ubuntu', 'focal')],
-                         [Base('ubuntu', 'focal')])
+    bases: List[Base] = [Base(build_on=[Platform('ubuntu', 'focal')],
+                              run_on=[Platform('ubuntu', 'focal')])]
     subordinate: bool = False
 
     def on_install(self, callback: Callable[[InstallEvent], None]) -> None:

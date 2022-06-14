@@ -36,9 +36,10 @@ CONFIG = {'options':
     }
 }
 CHARMCRAFT = {'type': 'charm',
-              'bases': {
+              'bases': [{
                   'build-on': [{'name': 'ubuntu', 'channel': 'focal'}],
-                  'run-on': [{'name': 'ubuntu', 'channel': 'focal'}]}
+                  'run-on': [{'name': 'ubuntu', 'channel': 'focal'}]
+              }]
               }
 
 
@@ -52,9 +53,9 @@ class ExampleJinx(Jinx):
     other_thing = config(float_('my description', default=1.2))
 
     get_data = action(dict(
-            foo=string(default='2'),
-            bar=integer(default=2),
-            baz=float_(default=2.2)
+        foo=string(default='2'),
+        bar=integer(default=2),
+        baz=float_(default=2.2)
 
     ))
 
