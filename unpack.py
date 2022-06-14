@@ -2,6 +2,7 @@
 
 import os
 import shutil
+import stat
 from dataclasses import asdict
 from typing import Union, Type, Sequence, Optional
 from pathlib import Path
@@ -102,6 +103,7 @@ def unpack(path_to_jinx: Union[str, Path], root: Union[str, Path] = None,
         include = include.split(';')
 
     root = (root or Path()).absolute()
+    path_to_jinx = Path(path_to_jinx).absolute()
 
     jinx = get_jinx_class(path_to_jinx)
     dump_metadata(jinx, root, license)
@@ -125,7 +127,12 @@ def unpack(path_to_jinx: Union[str, Path], root: Union[str, Path] = None,
             print('expected /src directory; found a "src" file!')
             return
 
-        shutil.copy2(path_to_jinx, charmfile)
+        if not path_to_jinx == charmfile:
+            shutil.copy2(path_to_jinx, charmfile)
+            # chmod +x
+            st = os.stat(charmfile)
+            os.chmod(charmfile, st.st_mode | stat.S_IEXEC)
+
         for name in include:
             pth = Path(name)
             if pth.is_dir():

@@ -20,6 +20,7 @@ async def test_template(ops_test: OpsTest):
     with tempfile.TemporaryDirectory() as tempdir:
         tempdir = Path(tempdir)
         expected_charm_file = tempdir / 'src' / 'charm.py'
+        assert not expected_charm_file.exists()
 
         with tempdir:
             Popen(script.split()).wait()
